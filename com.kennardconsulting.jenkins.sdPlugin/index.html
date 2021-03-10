@@ -121,10 +121,18 @@
 							if ( indexOfHref !== -1 ) {
 								var indexOfTooltipStart = responseText.indexOf( 'Estimated remaining time: ', indexOfHref ) + 26;
 								if ( indexOfTooltipStart > 26 ) {
-									var indexOfTooltipEnd = responseText.indexOf( ' min', indexOfTooltipStart );
+									var indexOfTooltipEnd = responseText.indexOf( '"', indexOfTooltipStart );
 									if ( indexOfTooltipEnd !== -1 ) {
 										var tooltip = responseText.substring( indexOfTooltipStart, indexOfTooltipEnd );
-										setTitle(websocket, context, settings.title + '...\n' + tooltip + ' min');
+										var indexOfMin = tooltip.indexOf( ' min' );
+										if ( indexOfMin !== -1 ) {
+											setTitle(websocket, context, settings.title + '...\n' + tooltip.substring( 0, indexOfMin ) + ' min');
+										} else {
+											var indexOfSec = tooltip.indexOf( ' sec' );
+											if ( indexOfSec !== -1 ) {
+												setTitle(websocket, context, settings.title + '...\n' + tooltip.substring( 0, indexOfSec ) + ' sec');
+											}
+										}
 									}
 								}
 							}
@@ -138,6 +146,8 @@
 		}
 
 		// Stream Deck events
+
+		var setIntervals = {};
 
 		function connectElgatoStreamDeckSocket(inPort, inPluginUUID, inRegisterEvent, inInfo) {
 			var pluginUUID = inPluginUUID
@@ -189,8 +199,8 @@
 						}
 					}
 					xmlhttp.send();
-				}
-				else if (event == "willAppear") {
+
+				} else if (event == "willAppear") {
 					var settings = jsonPayload['settings'];
 					var coordinates = jsonPayload['coordinates'];
 
@@ -198,9 +208,20 @@
 
 					// Refresh periodically
 
-					setInterval( function() { refreshKey( websocket, context, settings ); }, 20000 )
-				}
-				else if (event == "sendToPlugin") {
+					if ( setIntervals[context] === undefined ) {
+						setIntervals[context] = setInterval( function() { refreshKey( websocket, context, settings ); }, 20000 );
+					}
+
+				} else if (event == "willDisappear") {
+
+					// Stop refreshing
+
+					if ( setIntervals[context] !== undefined ) {
+						clearInterval( setIntervals[context] );
+						setIntervals[context] = undefined;
+					}
+
+				} else if (event == "sendToPlugin") {
 					var settings = {
 						title: jsonPayload.title,
 						jenkinsUrl: jsonPayload.jenkinsUrl,
