@@ -1,0 +1,223 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+	<title>com.kennardconsulting.jenkins</title>
+	<meta charset="utf-8" />
+</head>
+
+<body>
+	<script>
+
+		var DestinationEnum = Object.freeze({ "HARDWARE_AND_SOFTWARE": 0, "HARDWARE_ONLY": 1, "SOFTWARE_ONLY": 2 })
+
+		/**
+		 * Update key title
+		 */
+
+		function setTitle( websocket, context, title ) {
+			var json = {
+				"event": "setTitle",
+				"context": context,
+				"payload": {
+					"title": title,
+					"target": DestinationEnum.HARDWARE_AND_SOFTWARE
+				}
+			};
+
+			websocket.send(JSON.stringify(json));
+		}
+
+		/**
+		 * Update key image
+		 */
+
+		function setImage( websocket, context, url ) {
+
+			var image = new Image();
+
+			image.onload = function () {
+				var canvas = document.createElement("canvas");
+
+				canvas.width = this.naturalWidth;
+				canvas.height = this.naturalHeight;
+
+				var ctx = canvas.getContext("2d");
+				ctx.drawImage(this, 0, 0);
+
+				var json = {
+					"event": "setImage",
+					"context": context,
+					"payload": {
+						image: canvas.toDataURL("image/png") || "",
+						target: DestinationEnum.HARDWARE_AND_SOFTWARE
+					}
+				};
+				websocket.send(JSON.stringify(json));
+			};
+
+			image.src = url;
+		}
+
+		/**
+		 * Persist settings
+		 */
+
+		function setSettings(websocket, context, settings) {
+			var json = {
+				"event": "setSettings",
+				"context": context,
+				"payload": settings
+			};
+
+			websocket.send(JSON.stringify(json));
+		}
+
+		/**
+		 * Fetch Jenkins web page and refresh display
+		 */
+
+		function refreshKey(websocket, context, settings) {
+
+			var xmlhttp = new XMLHttpRequest();
+
+			if ( settings.jenkinsUrl == null || settings.buildName == null ) {
+				return;
+			}
+
+			xmlhttp.onreadystatechange = function() {
+				if (xmlhttp.readyState == XMLHttpRequest.DONE && xmlhttp.status == 200) {
+
+					// Determine status
+
+					var responseText = xmlhttp.responseText;
+					var indexOfJob = responseText.indexOf( 'id="job_' + settings.buildName + '"' );
+					if ( indexOfJob !== -1 ) {
+						var indexOfSrcStart = responseText.indexOf( 'src="', indexOfJob ) + 5;
+						var indexOfSrcEnd = responseText.indexOf( '"', indexOfSrcStart );
+						var imageSrc = responseText.substring( indexOfSrcStart, indexOfSrcEnd );
+
+						// Not in progress?
+
+						if ( imageSrc.indexOf( 'aborted' ) !== -1 ) {
+							setImage(websocket, context, 'build-aborted.png');
+						} else if ( imageSrc.indexOf( 'blue' ) !== -1 ) {
+							setImage(websocket, context, 'build-blue.png');
+						} else {
+							setImage(websocket, context, 'build-failed.png');
+						}
+
+						if ( imageSrc.indexOf( '_anime.gif' ) === -1 ) {
+							setTitle(websocket, context, settings.title);
+							return;
+						}
+
+						// In progress? Determine time remaining
+
+						var indexOfExecutors = responseText.indexOf( 'id="executors"' );
+
+						if ( indexOfExecutors !== -1 ) {
+							var indexOfHref = responseText.indexOf( 'href="/view/BUILDS/job/' + settings.buildName + '/"', indexOfExecutors );
+							if ( indexOfHref !== -1 ) {
+								var indexOfTooltipStart = responseText.indexOf( 'Estimated remaining time: ', indexOfHref ) + 26;
+								if ( indexOfTooltipStart > 26 ) {
+									var indexOfTooltipEnd = responseText.indexOf( ' min', indexOfTooltipStart );
+									if ( indexOfTooltipEnd !== -1 ) {
+										var tooltip = responseText.substring( indexOfTooltipStart, indexOfTooltipEnd );
+										setTitle(websocket, context, settings.title + '...\n' + tooltip + ' min');
+									}
+								}
+							}
+						}
+					}
+				}
+			};
+
+			xmlhttp.open("GET", settings.jenkinsUrl + "/view/BUILDS" );
+			xmlhttp.send();
+		}
+
+		// Stream Deck events
+
+		function connectElgatoStreamDeckSocket(inPort, inPluginUUID, inRegisterEvent, inInfo) {
+			var pluginUUID = inPluginUUID
+
+			// Open the web socket
+			var websocket = new WebSocket("ws://localhost:" + inPort);
+
+			function registerPlugin(inPluginUUID) {
+				var json = {
+					"event": inRegisterEvent,
+					"uuid": inPluginUUID
+				};
+
+				websocket.send(JSON.stringify(json));
+			};
+
+			websocket.onopen = function () {
+				// WebSocket is connected, send message
+				registerPlugin(pluginUUID);
+			};
+
+			websocket.onmessage = function (evt) {
+				// Received message from Stream Deck
+				var jsonObj = JSON.parse(evt.data);
+				var event = jsonObj['event'];
+				var action = jsonObj['action'];
+				var context = jsonObj['context'];
+				var jsonPayload = jsonObj['payload'] || {};
+
+				if (event == "keyDown") {
+					var settings = jsonPayload['settings'];
+					var coordinates = jsonPayload['coordinates'];
+					var userDesiredState = jsonPayload['userDesiredState'];
+
+					// Fetch the crumb...
+
+					var xmlhttp = new XMLHttpRequest();
+					xmlhttp.open("GET", settings.jenkinsUrl + "/crumbIssuer/api/json" );
+					xmlhttp.onreadystatechange = function() {
+						if (xmlhttp.readyState == XMLHttpRequest.DONE && xmlhttp.status == 200) {
+							var crumbJSON = JSON.parse( xmlhttp.responseText );
+
+							// ...and send it
+
+							xmlhttp.onreadystatechange = undefined;
+							xmlhttp.open("POST", settings.jenkinsUrl + "/view/BUILDS/job/" + settings.buildName + "/build?delay=0sec" );
+							xmlhttp.setRequestHeader( 'Jenkins-Crumb', crumbJSON.crumb );
+							xmlhttp.send();
+						}
+					}
+					xmlhttp.send();
+				}
+				else if (event == "willAppear") {
+					var settings = jsonPayload['settings'];
+					var coordinates = jsonPayload['coordinates'];
+
+					refreshKey( websocket, context, settings );
+
+					// Refresh periodically
+
+					setInterval( function() { refreshKey( websocket, context, settings ); }, 20000 )
+				}
+				else if (event == "sendToPlugin") {
+					var settings = {
+						title: jsonPayload.title,
+						jenkinsUrl: jsonPayload.jenkinsUrl,
+						buildName: jsonPayload.buildName
+					};
+					setSettings(websocket, context, settings);
+					refreshKey(websocket, context, settings);
+				}
+			};
+
+			websocket.onclose = function () {
+				// Websocket is closed
+			};
+		};
+
+	</script>
+
+</body>
+
+</html>

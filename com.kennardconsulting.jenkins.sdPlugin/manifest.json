@@ -1,0 +1,41 @@
+{
+  "Actions": [
+    {
+      "Icon": "actionIcon",
+      "Name": "Jenkins",
+      "States": [
+        {
+          "Image": "actionDefaultImage",
+          "TitleAlignment": "middle",
+          "FontSize": "12"
+        }
+      ],
+      "SupportedInMultiActions": false,
+      "Tooltip": "This action displays a value set by the user",
+      "UUID": "com.kennardconsulting.jenkins.action"
+    }
+  ],
+  "SDKVersion": 2,
+  "Author": "Kennard Consulting",
+  "CodePath": "index.html",
+  "Description": "This integrates with Jenkins",
+  "Name": "Jenkins",
+  "Icon": "pluginIcon",
+  "URL": "https://www.kennardconsulting.com",
+  "PropertyInspectorPath": "jenkins_pi.html",
+  "Version": "1.4",
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "10.11"
+    },
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Software": 
+    {
+        "MinimumVersion" : "4.1"
+    }
+}

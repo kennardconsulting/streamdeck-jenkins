@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>com.kennardconsulting.jenkins PI</title>
+    <link rel="stylesheet" href="sdpi.css">
+    <script src="common.js"></script>
+</head>
+
+<body>
+    <div class="sdpi-wrapper">
+        <div type="text" class="sdpi-item">
+            <div class="sdpi-item-label">Title</div>
+            <div class="sdpi-item-value">
+                <input id="title" class="sdpi-item-value" type="text" oninput="sendValueToPlugin()" placeholder="http://localhost:5602">
+            </div>
+        </div>
+        <div type="text" class="sdpi-item">
+            <div class="sdpi-item-label">Jenkins URL</div>
+            <div class="sdpi-item-value">
+                <input id="jenkinsUrl" class="sdpi-item-value" type="text" oninput="sendValueToPlugin()" placeholder="http://localhost:5602">
+            </div>
+        </div>
+        <div type="text" class="sdpi-item">
+            <div class="sdpi-item-label">Build Name</div>
+            <div class="sdpi-item-value">
+                <input id="buildName" class="sdpi-item-value" type="text" oninput="sendValueToPlugin()" placeholder="Build-Master">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var pluginAction = null;
+        var uuid = '';
+
+        if ($SD) {
+            $SD.on('connected', function (jsonObj) {
+                uuid = jsonObj['uuid'];
+                if (jsonObj.hasOwnProperty('actionInfo')) {
+                    pluginAction = jsonObj.actionInfo['action'];
+                    var settings = jsonObj.actionInfo.payload.settings;
+                    if ( settings !== undefined ) {
+                    	if ( settings.title !== undefined ) {
+                    		document.getElementById( 'title' ).value = settings.title;
+                    	}
+                    	if ( settings.jenkinsUrl !== undefined ) {
+                    		document.getElementById( 'jenkinsUrl' ).value = settings.jenkinsUrl;
+                    	}
+                    	if ( settings.buildName !== undefined ) {
+		                    document.getElementById( 'buildName' ).value = settings.buildName;
+						}
+					}
+                }
+            });
+        };
+
+        /** you can also use ES6 syntax like so:
+        *
+        *   if ($SD) $SD.on('connected', (jsonObj) => { uuid=jsonObj.uuid }));
+        *
+        */
+
+        function sendValueToPlugin() {
+
+            if ($SD && $SD.connection) {
+                $SD.api.sendToPlugin(uuid, pluginAction, {
+                	title: document.getElementById( 'title' ).value,
+                	jenkinsUrl: document.getElementById( 'jenkinsUrl' ).value,
+                	buildName: document.getElementById( 'buildName' ).value
+                } );
+            }
+        }
+
+    </script>
+
+</body>
+
+</html>
