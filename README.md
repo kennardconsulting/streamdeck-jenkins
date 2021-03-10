@@ -5,4 +5,4 @@ WARNING: this plugin is for personal use. Whilst it works well for me, and I hop
 
 ## Installation
 
-Download all files. ZIP them into a folder. Rename the .zip to .streamDeckPlugin. Double click to install
+Download the ZIP from GitHub. Rename the .zip to .streamDeckPlugin. Double click to install
