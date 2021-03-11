@@ -77,6 +77,8 @@
 		 * Fetch Jenkins web page and refresh display
 		 */
 
+		var flashIcon = {};
+
 		function refreshKey(websocket, context, settings) {
 
 			var xmlhttp = new XMLHttpRequest();
@@ -99,16 +101,24 @@
 
 						// Not in progress?
 
+						var imageFile;
+
 						if ( imageSrc.indexOf( 'aborted' ) !== -1 ) {
-							setImage(websocket, context, 'build-aborted.png');
+							imageFile = 'build-aborted';
 						} else if ( imageSrc.indexOf( 'blue' ) !== -1 ) {
-							setImage(websocket, context, 'build-blue.png');
+							imageFile = 'build-blue';
 						} else {
-							setImage(websocket, context, 'build-failed.png');
+							imageFile = 'build-failed';
 						}
 
 						if ( imageSrc.indexOf( '_anime.gif' ) === -1 ) {
 							setTitle(websocket, context, settings.title);
+							setImage(websocket, context, imageFile + '.png');
+
+							if ( flashIcon[context] !== undefined ) {
+								clearInterval( flashIcon[context] );
+								delete flashIcon[context];
+							}
 							return;
 						}
 
@@ -137,6 +147,23 @@
 								}
 							}
 						}
+
+						// Flash the icon
+
+						if ( flashIcon[context] === undefined ) {
+							setImage(websocket, context, imageFile + '-light.png');
+							var light = true;
+							flashIcon[context] = setInterval( function() {
+								light = !light;
+								if ( light === true ) {
+									setImage(websocket, context, imageFile + '-light.png');
+								} else {
+									setImage(websocket, context, imageFile + '.png');
+								}
+							}, 1000 );
+						}
+
+
 					}
 				}
 			};
@@ -218,7 +245,7 @@
 
 					if ( setIntervals[context] !== undefined ) {
 						clearInterval( setIntervals[context] );
-						setIntervals[context] = undefined;
+						delete setIntervals[context];
 					}
 
 				} else if (event == "sendToPlugin") {
