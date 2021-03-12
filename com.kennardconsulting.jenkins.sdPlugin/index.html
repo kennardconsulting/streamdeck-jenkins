@@ -74,6 +74,19 @@
 		}
 
 		/**
+		 * Temporarily show OK
+		 */
+
+		function showOk( websocket, context ) {
+			var json = {
+				"event": "showOk",
+				"context": context
+			};
+
+			websocket.send(JSON.stringify(json));
+		}
+
+		/**
 		 * Fetch Jenkins web page and refresh display
 		 */
 
@@ -136,11 +149,11 @@
 										var tooltip = responseText.substring( indexOfTooltipStart, indexOfTooltipEnd );
 										var indexOfMin = tooltip.indexOf( ' min' );
 										if ( indexOfMin !== -1 ) {
-											setTitle(websocket, context, settings.title + '...\n' + tooltip.substring( 0, indexOfMin ) + ' min');
+											setTitle(websocket, context, settings.title + '\n' + tooltip.substring( 0, indexOfMin ) + ' min');
 										} else {
 											var indexOfSec = tooltip.indexOf( ' sec' );
 											if ( indexOfSec !== -1 ) {
-												setTitle(websocket, context, settings.title + '...\n' + tooltip.substring( 0, indexOfSec ) + ' sec');
+												setTitle(websocket, context, settings.title + '\n' + tooltip.substring( 0, indexOfSec ) + ' sec');
 											}
 										}
 									}
@@ -217,12 +230,25 @@
 						if (xmlhttp.readyState == XMLHttpRequest.DONE && xmlhttp.status == 200) {
 							var crumbJSON = JSON.parse( xmlhttp.responseText );
 
+							xmlhttp.onreadystatechange = undefined;
+
 							// ...and send it
 
-							xmlhttp.onreadystatechange = undefined;
-							xmlhttp.open("POST", settings.jenkinsUrl + "/view/BUILDS/job/" + settings.buildName + "/build?delay=0sec" );
-							xmlhttp.setRequestHeader( 'Jenkins-Crumb', crumbJSON.crumb );
-							xmlhttp.send();
+							if ( flashIcon[context] === undefined ) {
+								xmlhttp.open("POST", settings.jenkinsUrl + "/view/BUILDS/job/" + settings.buildName + "/build?delay=0sec" );
+								xmlhttp.setRequestHeader( 'Jenkins-Crumb', crumbJSON.crumb );
+								xmlhttp.send();
+							} else {
+								xmlhttp.open("POST", settings.jenkinsUrl + "/computer/(master)/executors/0/stop" );
+								xmlhttp.setRequestHeader( 'Jenkins-Crumb', crumbJSON.crumb );
+								xmlhttp.send();
+
+								xmlhttp.open("POST", settings.jenkinsUrl + "/computer/(master)/executors/1/stop" );
+								xmlhttp.setRequestHeader( 'Jenkins-Crumb', crumbJSON.crumb );
+								xmlhttp.send();
+							}
+
+							showOk( websocket, context );
 						}
 					}
 					xmlhttp.send();
@@ -246,6 +272,10 @@
 					if ( setIntervals[context] !== undefined ) {
 						clearInterval( setIntervals[context] );
 						delete setIntervals[context];
+					}
+					if ( flashIcon[context] !== undefined ) {
+						clearInterval( flashIcon[context] );
+						delete flashIcon[context];
 					}
 
 				} else if (event == "sendToPlugin") {
